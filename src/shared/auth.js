@@ -20,10 +20,18 @@ function signToken(user) {
   });
 }
 
+function tokenMaxAgeMs(expiresIn) {
+  const match = /^(\d+)([dhms])$/.exec(expiresIn);
+  if (!match) return 30 * 24 * 60 * 60 * 1000;
+  const amount = Number(match[1]);
+  const unitMs = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+  return amount * unitMs[match[2]];
+}
+
 function setAuthCookie(res, token) {
   res.cookie(COOKIE_NAME, token, {
     ...cookieOptions(),
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: tokenMaxAgeMs(env.JWT_EXPIRES_IN),
   });
 }
 

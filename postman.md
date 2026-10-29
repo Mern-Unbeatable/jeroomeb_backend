@@ -115,4 +115,4 @@ If you change the admin password here, put the new value back into `SEED_ADMIN_P
   
 `POST http://localhost:3000/api/v1/auth/logout`
 
-No body. Expect `200` and `{ "message": "Logged out" }`. The `access_token` cookie is cleared. A Bearer token copied earlier still works until it expires (7 days).
+No body. Expect `200` and `{ "message": "Logged out" }`. The `access_token` cookie is cleared. A Bearer token copied earlier still works until it expires (30 days).

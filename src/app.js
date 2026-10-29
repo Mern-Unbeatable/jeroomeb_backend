@@ -8,6 +8,10 @@ function createApp() {
   app.use(express.json());
   app.use(cookieParser());
 
+  app.get("/", (req, res) => {
+    res.json({ ok: true, message: "API is running properly" });
+  });
+
   app.get("/health", (req, res) => {
     res.json({ ok: true, message: "Server is running" });
   });
