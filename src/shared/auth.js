@@ -51,34 +51,50 @@ function readToken(req) {
   return null;
 }
 
+async function authenticate(req) {
+  const token = readToken(req);
+  if (!token) return null;
+
+  let payload;
+  try {
+    payload = jwt.verify(token, env.JWT_SECRET);
+  } catch {
+    throw new HttpError(401, "Invalid or expired token");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+    include: {
+      organization: {
+        select: { id: true, name: true, subscriptionStatus: true },
+      },
+    },
+  });
+
+  if (!user || user.status === "DISABLED") {
+    throw new HttpError(401, "Authentication required");
+  }
+
+  return user;
+}
+
 async function requireAuth(req, res, next) {
   try {
-    const token = readToken(req);
-    if (!token) {
+    const user = await authenticate(req);
+    if (!user) {
       throw new HttpError(401, "Authentication required");
     }
-
-    let payload;
-    try {
-      payload = jwt.verify(token, env.JWT_SECRET);
-    } catch {
-      throw new HttpError(401, "Invalid or expired token");
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: payload.sub },
-      include: {
-        organization: {
-          select: { id: true, name: true, subscriptionStatus: true },
-        },
-      },
-    });
-
-    if (!user || user.status === "DISABLED") {
-      throw new HttpError(401, "Authentication required");
-    }
-
     req.user = user;
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function optionalAuth(req, res, next) {
+  try {
+    const user = await authenticate(req);
+    if (user) req.user = user;
     next();
   } catch (error) {
     next(error);
@@ -104,5 +120,6 @@ module.exports = {
   setAuthCookie,
   clearAuthCookie,
   requireAuth,
+  optionalAuth,
   requireRole,
 };

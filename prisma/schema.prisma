@@ -305,6 +305,7 @@ model ServiceRequest {
   property       Property?             @relation(fields: [propertyId], references: [id])
   submittedById  String?
   submittedBy    User?                 @relation("RequestSubmitter", fields: [submittedById], references: [id])
+  kind           PlanKind?
   propertyType   PropertyType
   unitCount      Int?
   buildingCount  Int?
@@ -372,6 +373,7 @@ model AffiliateProfile {
   companyName       String
   jobTitle          String?
   website           String?
+  businessType      String?
   marketSummary     String?
   portfolioBand     String?
   strategyAnswers   Json?
