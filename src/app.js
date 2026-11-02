@@ -1,10 +1,32 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
+const cors = require("cors");
+const env = require("./config/env");
 const { registerModules } = require("./modules");
+
+const allowedOrigins = new Set(
+  env.CORS_ORIGINS.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
 
 function createApp() {
   const app = express();
 
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.has(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
+      credentials: true,
+      methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    })
+  );
   app.use(express.json());
   app.use(cookieParser());
 

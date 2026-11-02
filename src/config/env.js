@@ -15,6 +15,17 @@ const envSchema = z.object({
     .min(1, "SMTP_PASS is required")
     .transform((value) => value.replace(/\s/g, "")),
   SMTP_FROM: z.string().min(1).optional(),
+  CORS_ORIGINS: z
+    .string()
+    .default(
+      [
+        "https://jeroomeb.maktechgroup.tech",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:74",
+        "http://127.0.0.1:74",
+      ].join(",")
+    ),
 });
 
 const parsed = envSchema.safeParse(process.env);
