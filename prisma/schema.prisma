@@ -254,6 +254,8 @@ model Property {
   geofenceRadiusMeters Int                     @default(100)
   timezone             String                  @default("America/New_York")
   photoIdRequired      Boolean                 @default(false)
+  checklistsAvailable247 Boolean               @default(false)
+  scheduledAt          DateTime?
   compensationTierId   String?
   compensationTier     CompensationTier?       @relation(fields: [compensationTierId], references: [id])
   inspectionDays       PropertyInspectionDay[]

@@ -193,6 +193,39 @@ Expect `200` and one `serviceRequest`. This is See Details.
 
 Expect `200` and `{ "message": "Service request deleted" }`. An unknown id returns `404`. With no token, expect `401`.
 
+## 10b. Tenants, properties, and users
+
+These need the super admin token.
+
+`POST http://localhost:3000/api/v1/organizations/provision`
+
+```json
+{
+  "name": "Northstar Communities",
+  "admin": {
+    "fullName": "Jordan Hale",
+    "email": "jordan@northstar.example",
+    "phone": "555-0100"
+  }
+}
+```
+
+Expect `201` with the tenant, a `TENANT_ADMIN` user, and a `temporaryPassword`. Optional `licensePlanId` and `checklistTemplateIds` attach a plan and checklist access.
+
+`GET /api/v1/organizations` lists tenants. `GET /api/v1/organizations/<id>` is the tenant detail.
+
+`POST /api/v1/properties` creates a property for that tenant. `GET /api/v1/properties` lists them. `PATCH /api/v1/properties/<id>` edits one. Sending a new `status` writes an activity event. `DELETE /api/v1/properties/<id>` deletes it.
+
+`POST /api/v1/properties/<id>/roster`
+
+```json
+{ "specialistId": "specialist-profile-id", "assignment": "PRIMARY" }
+```
+
+`assignment` is `PRIMARY`, `BACKUP`, or `IN_HOUSE`. `DELETE /api/v1/properties/<id>/roster/<roster-id>` removes that assignment.
+
+`GET /api/v1/users` lists users. Add `?role=TENANT_ADMIN` to filter. `GET /api/v1/users/<id>` is one user, without the password hash.
+
 ## 11. Specialist application
 
 `GET http://localhost:3000/api/v1/specialists/options` returns the travel ranges, shifts, property types, and comfort ratings.
