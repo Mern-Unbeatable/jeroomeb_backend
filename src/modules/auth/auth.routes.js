@@ -11,6 +11,7 @@ router.post("/logout", authController.logout);
 router.post("/forgot-password", asyncHandler(authController.forgotPassword));
 router.post("/verify-otp", asyncHandler(authController.verifyOtp));
 router.post("/reset-password", asyncHandler(authController.resetPassword));
+router.post("/change-password", requireAuth, asyncHandler(authController.changePassword));
 router.get("/me", requireAuth, asyncHandler(authController.me));
 
 module.exports = router;

@@ -32,6 +32,12 @@ const resetPasswordSchema = z.object({
   confirmPassword: z.string().min(1).max(72),
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(72),
+  newPassword: z.string().min(8).max(72),
+  confirmPassword: z.string().min(1).max(72),
+});
+
 function parseBody(schema, body) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -46,5 +52,6 @@ module.exports = {
   forgotPasswordSchema,
   verifyOtpSchema,
   resetPasswordSchema,
+  changePasswordSchema,
   parseBody,
 };

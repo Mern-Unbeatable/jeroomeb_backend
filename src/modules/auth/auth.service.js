@@ -269,6 +269,33 @@ async function resetPassword(input) {
   return { message: "Password updated" };
 }
 
+async function changePassword(userId, input) {
+  if (input.newPassword !== input.confirmPassword) {
+    throw new HttpError(400, "Passwords do not match");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || user.status === "DISABLED") {
+    throw new HttpError(401, "Authentication required");
+  }
+
+  const currentMatches = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!currentMatches) {
+    throw new HttpError(400, "Current password is incorrect");
+  }
+  if (input.currentPassword === input.newPassword) {
+    throw new HttpError(400, "New password must be different");
+  }
+
+  const passwordHash = await bcrypt.hash(input.newPassword, 12);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, mustChangePassword: false },
+  });
+
+  return { message: "Password updated" };
+}
+
 function currentUser(user) {
   return toPublicUser(user);
 }
@@ -279,5 +306,6 @@ module.exports = {
   forgotPassword,
   verifyOtp,
   resetPassword,
+  changePassword,
   currentUser,
 };

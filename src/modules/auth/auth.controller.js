@@ -6,6 +6,7 @@ const {
   forgotPasswordSchema,
   verifyOtpSchema,
   resetPasswordSchema,
+  changePasswordSchema,
   parseBody,
 } = require("./auth.validation");
 const authService = require("./auth.service");
@@ -47,6 +48,12 @@ async function resetPassword(req, res) {
   res.json(result);
 }
 
+async function changePassword(req, res) {
+  const input = parseBody(changePasswordSchema, req.body);
+  const result = await authService.changePassword(req.user.id, input);
+  res.json(result);
+}
+
 async function me(req, res) {
   if (!req.user) {
     throw new HttpError(401, "Authentication required");
@@ -61,5 +68,6 @@ module.exports = {
   forgotPassword,
   verifyOtp,
   resetPassword,
+  changePassword,
   me,
 };
