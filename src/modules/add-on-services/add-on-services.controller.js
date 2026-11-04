@@ -13,6 +13,7 @@ async function list(req, res) {
   res.json(await addOnService.list(req.user));
 }
 
+// Create a new add-on service
 async function create(req, res) {
   const input = parseBody(createAddOnSchema, req.body);
   const result = await addOnService.create(input, req.user);
