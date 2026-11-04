@@ -2,6 +2,8 @@ const { z } = require("zod");
 const { parseBody, HttpError } = require("../../shared/http");
 const {
   createServiceRequestSchema,
+  requestAddOnSchema,
+  confirmAddOnSchema,
   updateStatusSchema,
 } = require("./service-requests.validation");
 const serviceRequestService = require("./service-requests.service");
@@ -22,12 +24,23 @@ async function create(req, res) {
   res.status(201).json(result);
 }
 
+async function requestAddOn(req, res) {
+  const input = parseBody(requestAddOnSchema, req.body);
+  const result = await serviceRequestService.requestAddOn(req.user, input.addOnServiceId);
+  res.status(201).json(result);
+}
+
+async function confirmAddOn(req, res) {
+  const input = parseBody(confirmAddOnSchema, req.body);
+  res.json(await serviceRequestService.confirmAddOn(req.user, input.sessionId));
+}
+
 async function list(req, res) {
-  res.json(await serviceRequestService.list(req.query.status));
+  res.json(await serviceRequestService.list(req.query.status, req.user));
 }
 
 async function show(req, res) {
-  res.json(await serviceRequestService.getById(requestId(req.params.id)));
+  res.json(await serviceRequestService.getById(requestId(req.params.id), req.user));
 }
 
 async function updateStatus(req, res) {
@@ -44,4 +57,13 @@ async function remove(req, res) {
   res.json(await serviceRequestService.remove(requestId(req.params.id), req.user));
 }
 
-module.exports = { options, create, list, show, updateStatus, remove };
+module.exports = {
+  options,
+  create,
+  requestAddOn,
+  confirmAddOn,
+  list,
+  show,
+  updateStatus,
+  remove,
+};

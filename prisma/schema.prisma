@@ -328,8 +328,9 @@ model ServiceRequest {
   companyName    String
   email          String
   phone          String?
-  notes          String?
-  status         ServiceRequestStatus  @default(PENDING_REVIEW)
+  notes                   String?
+  stripeCheckoutSessionId String?               @unique
+  status                  ServiceRequestStatus  @default(PENDING_REVIEW)
   classification ServiceClassification?
   items          ServiceRequestItem[]
   createdAt      DateTime              @default(now())

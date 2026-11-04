@@ -68,6 +68,14 @@ const createServiceRequestSchema = z.object({
   informationConfirmed: z.literal(true),
 });
 
+const requestAddOnSchema = z.object({
+  addOnServiceId: z.uuid(),
+});
+
+const confirmAddOnSchema = z.object({
+  sessionId: z.string().trim().min(1),
+});
+
 const updateStatusSchema = z.object({
   status: z.string().trim().refine((value) => statusActions[value], {
     message: "Unknown status",
@@ -80,5 +88,7 @@ module.exports = {
   statusActions,
   statusFilters,
   createServiceRequestSchema,
+  requestAddOnSchema,
+  confirmAddOnSchema,
   updateStatusSchema,
 };

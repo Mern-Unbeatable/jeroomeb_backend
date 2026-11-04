@@ -1,4 +1,5 @@
 const prisma = require("../../shared/prisma");
+const stripe = require("../../shared/stripe");
 const { HttpError } = require("../../shared/http");
 const { createCode, isUniqueConflict } = require("../../shared/codes");
 const {
@@ -168,8 +169,171 @@ async function create(input, user) {
   throw new HttpError(500, "Could not save the quote");
 }
 
-async function list(status) {
-  const where = {};
+function toCents(amount) {
+  const cents = Math.round(Number(amount.toString()) * 100);
+  if (!Number.isInteger(cents) || cents < 50) {
+    throw new HttpError(400, "This add-on cannot be checked out");
+  }
+  return cents;
+}
+
+function checkoutReturnUrl(value) {
+  const fallback = "https://jeroomeb.maktechgroup.tech/billing/success";
+  const target = value || fallback;
+  if (target.includes("{CHECKOUT_SESSION_ID}")) return target;
+  return `${target}${target.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`;
+}
+
+async function fullServiceAccount(user) {
+  if (!user.organizationId) throw new HttpError(403, "This account has no company");
+  const organization = await prisma.organization.findUnique({
+    where: { id: user.organizationId },
+    include: { properties: { orderBy: { createdAt: "desc" }, take: 1 } },
+  });
+  if (
+    !organization ||
+    organization.subscriptionStatus !== "ACTIVE" ||
+    organization.planKind !== "FULL_SERVICE"
+  ) {
+    throw new HttpError(403, "Add-ons are available on an active Service + Software plan");
+  }
+  return organization;
+}
+
+async function requestAddOn(user, addOnServiceId) {
+  const organization = await fullServiceAccount(user);
+  const addOn = await prisma.addOnService.findFirst({
+    where: { id: addOnServiceId, active: true, sortOrder: { gt: 0 } },
+  });
+  if (!addOn) throw new HttpError(404, "Add-on not found");
+
+  const existing = await prisma.serviceRequest.findFirst({
+    where: {
+      organizationId: organization.id,
+      status: { in: ["PENDING_REVIEW", "APPROVED", "ONGOING", "IN_PROGRESS"] },
+      items: { some: { addOnServiceId } },
+    },
+  });
+  if (existing && existing.status === "PENDING_REVIEW") {
+    throw new HttpError(409, "This add-on is already requested");
+  }
+  if (existing) throw new HttpError(409, "This add-on is already active");
+
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer_email: user.email,
+      client_reference_id: organization.id,
+      metadata: {
+        purpose: "ADD_ON",
+        organizationId: organization.id,
+        addOnServiceId: addOn.id,
+        userId: user.id,
+      },
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: toCents(addOn.price),
+            product_data: { name: addOn.name },
+          },
+        },
+      ],
+      success_url: checkoutReturnUrl(),
+      cancel_url: "https://jeroomeb.maktechgroup.tech/billing/cancel",
+    });
+  } catch (error) {
+    console.error(error);
+    throw new HttpError(502, "Payment could not be started");
+  }
+
+  return { sessionId: session.id, url: session.url };
+}
+
+async function confirmAddOn(user, sessionId) {
+  const organization = await fullServiceAccount(user);
+  const saved = await prisma.serviceRequest.findUnique({
+    where: { stripeCheckoutSessionId: sessionId },
+    include: requestInclude,
+  });
+  if (saved) {
+    if (saved.organizationId !== organization.id) {
+      throw new HttpError(403, "You do not have access to this payment");
+    }
+    return { serviceRequest: toDetail(saved) };
+  }
+
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch (error) {
+    console.error(error);
+    throw new HttpError(400, "Payment session not found");
+  }
+  if (session.metadata.purpose !== "ADD_ON" || session.metadata.organizationId !== organization.id) {
+    throw new HttpError(403, "You do not have access to this payment");
+  }
+  if (session.payment_status !== "paid") {
+    throw new HttpError(400, "Payment is not complete");
+  }
+
+  const addOn = await prisma.addOnService.findFirst({
+    where: { id: session.metadata.addOnServiceId, sortOrder: { gt: 0 } },
+  });
+  if (!addOn) throw new HttpError(404, "Add-on not found");
+
+  const property = organization.properties[0];
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const request = await prisma.serviceRequest.create({
+        data: {
+          code: createCode("SR"),
+          organizationId: organization.id,
+          submittedById: user.id,
+          propertyId: property ? property.id : null,
+          kind: "FULL_SERVICE",
+          propertyType: property ? property.propertyType : "RESIDENTIAL_MULTI_TENANT",
+          unitCount: property && property.unitCount ? property.unitCount : 1,
+          buildingCount: property ? property.buildingCount : null,
+          contactName: user.fullName,
+          companyName: organization.name,
+          email: normalizeEmail(user.email),
+          phone: user.phone,
+          notes: `Paid add-on ${addOn.name}`,
+          stripeCheckoutSessionId: session.id,
+          status: "PENDING_REVIEW",
+          items: { create: [{ addOnServiceId: addOn.id }] },
+        },
+        include: requestInclude,
+      });
+      return { serviceRequest: toDetail(request) };
+    } catch (error) {
+      if (isUniqueConflict(error, "stripeCheckoutSessionId")) {
+        const current = await prisma.serviceRequest.findUnique({
+          where: { stripeCheckoutSessionId: sessionId },
+          include: requestInclude,
+        });
+        if (current) return { serviceRequest: toDetail(current) };
+      }
+      if (isUniqueConflict(error, "code") && attempt < 4) continue;
+      throw error;
+    }
+  }
+  throw new HttpError(500, "Could not save the add-on request");
+}
+
+function ownedWhere(actor) {
+  if (!actor || actor.role === "SUPER_ADMIN" || actor.role === "TEAM_MEMBER") return {};
+  const or = [{ submittedById: actor.id }, { email: normalizeEmail(actor.email) }];
+  if (actor.organizationId) or.unshift({ organizationId: actor.organizationId });
+  return { OR: or };
+}
+
+async function list(status, actor) {
+  const owned = ownedWhere(actor);
+  const where = { ...owned };
   if (status && status !== "all") {
     const mapped = statusFilters[status];
     if (!mapped) throw new HttpError(400, "Unknown status");
@@ -179,6 +343,7 @@ async function list(status) {
   const [groups, requests] = await Promise.all([
     prisma.serviceRequest.groupBy({
       by: ["status"],
+      where: owned,
       _count: { _all: true },
     }),
     prisma.serviceRequest.findMany({
@@ -194,12 +359,24 @@ async function list(status) {
   };
 }
 
-async function getById(id) {
+function canViewRequest(request, actor) {
+  if (!actor || actor.role === "SUPER_ADMIN" || actor.role === "TEAM_MEMBER") return true;
+  return (
+    (actor.organizationId && request.organizationId === actor.organizationId) ||
+    request.submittedById === actor.id ||
+    request.email === actor.email
+  );
+}
+
+async function getById(id, actor) {
   const request = await prisma.serviceRequest.findUnique({
     where: { id },
     include: requestInclude,
   });
   if (!request) throw new HttpError(404, "Service request not found");
+  if (!canViewRequest(request, actor)) {
+    throw new HttpError(403, "You do not have access to this");
+  }
   return { serviceRequest: toDetail(request) };
 }
 
@@ -259,4 +436,13 @@ async function remove(id, actor) {
   return { message: "Service request deleted" };
 }
 
-module.exports = { listOptions, create, list, getById, updateStatus, remove };
+module.exports = {
+  listOptions,
+  create,
+  requestAddOn,
+  confirmAddOn,
+  list,
+  getById,
+  updateStatus,
+  remove,
+};

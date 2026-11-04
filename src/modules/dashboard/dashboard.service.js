@@ -47,22 +47,33 @@ async function overview(user) {
     where: { organizationId: organization.id },
     orderBy: { createdAt: "desc" },
   });
-  const [requests, approved] = await Promise.all([
+  const owned = {
+    OR: [
+      { organizationId: organization.id },
+      { submittedById: user.id },
+      { email: user.email },
+    ],
+  };
+  const [requests, approved, pendingRequests, catalog] = await Promise.all([
     prisma.serviceRequest.count({
       where: { organizationId: organization.id, status: { in: openRequestStatuses } },
     }),
     prisma.serviceRequest.findMany({
-      where: {
-        status: { in: activeRequestStatuses },
-        OR: [
-          { organizationId: organization.id },
-          { submittedById: user.id },
-          { email: user.email },
-        ],
-      },
+      where: { status: { in: activeRequestStatuses }, ...owned },
       include: { items: { include: { addOnService: true } } },
       orderBy: { updatedAt: "desc" },
     }),
+    prisma.serviceRequest.findMany({
+      where: { status: "PENDING_REVIEW", ...owned },
+      include: { items: { include: { addOnService: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    organization.planKind === "FULL_SERVICE"
+      ? prisma.addOnService.findMany({
+          where: { active: true, sortOrder: { gt: 0 } },
+          orderBy: { sortOrder: "asc" },
+        })
+      : [],
   ]);
 
   const unlinked = approved.filter((request) => request.organizationId !== organization.id);
@@ -96,6 +107,37 @@ async function overview(user) {
     }
   }
 
+  const pendingIds = new Set();
+  const pendingAddOns = [];
+  for (const request of pendingRequests) {
+    for (const item of request.items) {
+      if (seen.has(item.addOnServiceId) || pendingIds.has(item.addOnServiceId)) continue;
+      if (item.addOnService.sortOrder === 0) continue;
+      pendingIds.add(item.addOnServiceId);
+      pendingAddOns.push({
+        id: item.addOnService.id,
+        name: item.addOnService.name,
+        description: item.addOnService.description,
+        price: item.addOnService.price.toString(),
+        status: "Pending Review",
+        requestId: request.id,
+        requestCode: request.code,
+      });
+    }
+  }
+  const availableAddOns =
+    organization.planKind === "FULL_SERVICE"
+      ? catalog
+          .filter((addOn) => !seen.has(addOn.id) && !pendingIds.has(addOn.id))
+          .map((addOn) => ({
+            id: addOn.id,
+            name: addOn.name,
+            description: addOn.description,
+            price: addOn.price.toString(),
+            status: "Available",
+          }))
+      : [];
+
   const plan = organization.servicePriceBand;
   return {
     user: { fullName: user.fullName, email: user.email },
@@ -124,6 +166,8 @@ async function overview(user) {
         }
       : null,
     services,
+    pendingAddOns,
+    availableAddOns,
   };
 }
 
