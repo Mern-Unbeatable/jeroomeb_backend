@@ -30,6 +30,16 @@ function toTenant(organization) {
     subscriptionStatus: organization.subscriptionStatus,
     propertyLimit: organization.propertyLimit,
     licensePlan: toPlan(organization.licensePlan),
+    planKind: organization.planKind,
+    paidAt: organization.paidAt,
+    priceBand: organization.servicePriceBand
+      ? {
+          id: organization.servicePriceBand.id,
+          name: organization.servicePriceBand.name,
+          kind: organization.servicePriceBand.kind,
+          monthlyPrice: money(organization.servicePriceBand.monthlyPrice),
+        }
+      : null,
     userCount: organization._count ? organization._count.users : undefined,
     propertyCount: organization._count ? organization._count.properties : undefined,
     createdAt: organization.createdAt,
@@ -38,6 +48,7 @@ function toTenant(organization) {
 
 const tenantInclude = {
   licensePlan: true,
+  servicePriceBand: true,
   _count: { select: { users: true, properties: true } },
 };
 

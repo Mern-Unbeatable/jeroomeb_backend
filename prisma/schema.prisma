@@ -28,6 +28,7 @@ enum PlanKind {
 }
 
 enum SubscriptionStatus {
+  UNPAID
   ACTIVE
   SUSPENDED
   CANCELLED
@@ -114,15 +115,16 @@ model LicensePlan {
 }
 
 model ServicePriceBand {
-  id           String   @id @default(uuid())
-  kind         PlanKind
-  name         String
-  minUnits     Int?
-  maxUnits     Int?
-  monthlyPrice Decimal  @db.Decimal(12, 2)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String         @id @default(uuid())
+  kind          PlanKind
+  name          String
+  minUnits      Int?
+  maxUnits      Int?
+  monthlyPrice  Decimal        @db.Decimal(12, 2)
+  active        Boolean        @default(true)
+  organizations Organization[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model AddOnService {
@@ -150,10 +152,16 @@ model CompensationTier {
 model Organization {
   id                 String                  @id @default(uuid())
   name               String
-  subscriptionStatus SubscriptionStatus      @default(ACTIVE)
-  licensePlanId      String?
-  licensePlan        LicensePlan?            @relation(fields: [licensePlanId], references: [id])
-  propertyLimit      Int?
+  subscriptionStatus   SubscriptionStatus      @default(ACTIVE)
+  planKind             PlanKind?
+  servicePriceBandId   String?
+  servicePriceBand     ServicePriceBand?       @relation(fields: [servicePriceBandId], references: [id])
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  paidAt               DateTime?
+  licensePlanId        String?
+  licensePlan          LicensePlan?            @relation(fields: [licensePlanId], references: [id])
+  propertyLimit        Int?
   users              User[]
   properties         Property[]
   serviceRequests    ServiceRequest[]

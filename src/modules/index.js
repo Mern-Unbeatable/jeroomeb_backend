@@ -14,6 +14,9 @@ const settingsRoutes = require("./settings/settings.routes");
 const contactRoutes = require("./contact/contact.routes");
 const analyticsRoutes = require("./analytics/analytics.routes");
 const activityRoutes = require("./activity/activity.routes");
+const billingRoutes = require("./billing/billing.routes");
+const priceBandRoutes = require("./price-bands/price-bands.routes");
+const dashboardRoutes = require("./dashboard/dashboard.routes");
 
 function registerModules(app) {
   app.use("/api/v1/auth", authRoutes);
@@ -32,6 +35,9 @@ function registerModules(app) {
   app.use("/api/v1/contact", contactRoutes);
   app.use("/api/v1/analytics", analyticsRoutes);
   app.use("/api/v1/activity", activityRoutes);
+  app.use("/api/v1/billing", billingRoutes);
+  app.use("/api/v1/price-bands", priceBandRoutes);
+  app.use("/api/v1/dashboard", dashboardRoutes);
 }
 
 module.exports = { registerModules };

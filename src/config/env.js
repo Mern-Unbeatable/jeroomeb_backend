@@ -25,6 +25,8 @@ const envSchema = z.object({
         "http://localhost:5174",
       ].join(",")
     ),
+  STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
+  STRIPE_PUBLISHABLE_KEY: z.string().min(1, "STRIPE_PUBLISHABLE_KEY is required"),
 });
 
 const parsed = envSchema.safeParse(process.env);

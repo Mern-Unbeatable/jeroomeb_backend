@@ -61,7 +61,7 @@ async function createAccount(input) {
     try {
       return await prisma.$transaction(async (tx) => {
         const organization = await tx.organization.create({
-          data: { name: input.companyName },
+          data: { name: input.companyName, subscriptionStatus: "UNPAID" },
         });
 
         const user = await tx.user.create({

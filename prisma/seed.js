@@ -60,10 +60,16 @@ async function seedSuperAdmin() {
   console.log(`Seeded super admin: ${normalizedEmail}`);
 }
 
+const priceBandRenames = [
+  ["FULL_SERVICE", "1-49 units", "Tier 1 (Baseline)"],
+  ["FULL_SERVICE", "50-149 units", "Tier 2 (Premier)"],
+  ["FULL_SERVICE", "150+ units", "Tier 3 (Sovereign)"],
+];
+
 const priceBands = [
-  { kind: "FULL_SERVICE", name: "1-49 units", minUnits: 1, maxUnits: 49, monthlyPrice: "115.00" },
-  { kind: "FULL_SERVICE", name: "50-149 units", minUnits: 50, maxUnits: 149, monthlyPrice: "170.00" },
-  { kind: "FULL_SERVICE", name: "150+ units", minUnits: 150, maxUnits: null, monthlyPrice: "225.00" },
+  { kind: "FULL_SERVICE", name: "Tier 1 (Baseline)", minUnits: 1, maxUnits: 49, monthlyPrice: "115.00" },
+  { kind: "FULL_SERVICE", name: "Tier 2 (Premier)", minUnits: 50, maxUnits: 149, monthlyPrice: "170.00" },
+  { kind: "FULL_SERVICE", name: "Tier 3 (Sovereign)", minUnits: 150, maxUnits: null, monthlyPrice: "225.00" },
   { kind: "SOFTWARE", name: "1-49 units", minUnits: 1, maxUnits: 49, monthlyPrice: "299.00" },
   { kind: "SOFTWARE", name: "50-149 units", minUnits: 50, maxUnits: 149, monthlyPrice: "449.00" },
   { kind: "SOFTWARE", name: "150+ units", minUnits: 150, maxUnits: null, monthlyPrice: "0.00" },
@@ -190,17 +196,29 @@ async function upsertBy(model, where, data) {
 }
 
 async function seedPriceBands() {
+  for (const [kind, from, to] of priceBandRenames) {
+    const existing = await prisma.servicePriceBand.findFirst({ where: { kind, name: from } });
+    if (!existing) continue;
+    const taken = await prisma.servicePriceBand.findFirst({ where: { kind, name: to } });
+    if (!taken) {
+      await prisma.servicePriceBand.update({ where: { id: existing.id }, data: { name: to } });
+    } else if (taken.id !== existing.id) {
+      await prisma.servicePriceBand.update({ where: { id: existing.id }, data: { active: false } });
+    }
+  }
+
   for (const band of priceBands) {
-    await upsertBy(
-      "servicePriceBand",
-      { kind: band.kind, name: band.name },
-      {
-        minUnits: band.minUnits,
-        maxUnits: band.maxUnits,
-        monthlyPrice: band.monthlyPrice,
-        active: true,
-      }
-    );
+    const existing = await prisma.servicePriceBand.findFirst({
+      where: { kind: band.kind, name: band.name },
+    });
+    if (existing) {
+      await prisma.servicePriceBand.update({
+        where: { id: existing.id },
+        data: { minUnits: band.minUnits, maxUnits: band.maxUnits, active: true },
+      });
+      continue;
+    }
+    await prisma.servicePriceBand.create({ data: band });
   }
 }
 

@@ -107,6 +107,21 @@ async function listOptions() {
   };
 }
 
+async function clientOwner(user, email) {
+  if (user && user.organizationId) {
+    return { organizationId: user.organizationId, submittedById: user.id };
+  }
+  const existing = await prisma.user.findFirst({
+    where: {
+      email,
+      organizationId: { not: null },
+      role: { in: ["CLIENT", "TENANT_ADMIN"] },
+    },
+  });
+  if (!existing) return { organizationId: null, submittedById: user ? user.id : null };
+  return { organizationId: existing.organizationId, submittedById: existing.id };
+}
+
 async function create(input, user) {
   const serviceIds = [...new Set(input.serviceIds)];
   const services = await prisma.addOnService.findMany({
@@ -117,13 +132,15 @@ async function create(input, user) {
     throw new HttpError(400, "One or more services are not available");
   }
 
+  const owner = await clientOwner(user, normalizeEmail(input.email));
+
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       const request = await prisma.serviceRequest.create({
         data: {
           code: createCode("SR"),
-          organizationId: user && user.organizationId ? user.organizationId : null,
-          submittedById: user ? user.id : null,
+          organizationId: owner.organizationId,
+          submittedById: owner.submittedById,
           kind: "FULL_SERVICE",
           propertyType: propertyTypeByInput.get(input.propertyType),
           unitCount: input.unitCount,
@@ -194,10 +211,19 @@ async function updateStatus(id, statusInput, actor) {
   if (!request) throw new HttpError(404, "Service request not found");
   if (request.status === status) return getById(id);
 
+  const owner = request.organizationId
+    ? null
+    : await clientOwner(null, normalizeEmail(request.email));
+
   await prisma.$transaction([
     prisma.serviceRequest.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(owner && owner.organizationId
+          ? { organizationId: owner.organizationId, submittedById: owner.submittedById }
+          : {}),
+      },
     }),
     prisma.activityEvent.create({
       data: {
