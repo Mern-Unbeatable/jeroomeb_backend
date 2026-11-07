@@ -16,6 +16,7 @@ async function create(req, res) {
   res.status(201).json(result);
 }
 
+// Update access key
 async function update(req, res) {
   const input = parseBody(updateAccessKeySchema, req.body);
   res.json(await accessKeyService.update(req.params.id, req.user, input));
