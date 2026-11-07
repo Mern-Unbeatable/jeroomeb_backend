@@ -166,6 +166,7 @@ model Organization {
   properties         Property[]
   serviceRequests    ServiceRequest[]
   checklistAccess    OrganizationChecklist[]
+  chat               Chat?
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 }
@@ -186,6 +187,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   submittedRequests   ServiceRequest[]     @relation("RequestSubmitter")
   activityEvents      ActivityEvent[]
+  chatMessages        ChatMessage[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -271,11 +273,28 @@ model Property {
   roster               PropertyRoster[]
   inspections          Inspection[]
   serviceRequests      ServiceRequest[]
+  accessKey            PropertyAccess?
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 
   @@index([organizationId])
   @@index([status])
+}
+
+model PropertyAccess {
+  id                    String   @id @default(uuid())
+  propertyId            String   @unique
+  property              Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  mainEntryInstructions String?
+  buildingAccessCode    String?
+  elevatorAccess        String?
+  lockboxCode           String?
+  emergencyContactName  String?
+  emergencyContactTitle String?
+  emergencyContactPhone String?
+  additionalNotes       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model PropertyInspectionDay {
@@ -466,6 +485,27 @@ model ContactMessage {
   phone     String?
   message   String
   createdAt DateTime @default(now())
+}
+
+model Chat {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages       ChatMessage[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
 }
 
 model ActivityEvent {

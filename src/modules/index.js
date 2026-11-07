@@ -18,6 +18,8 @@ const billingRoutes = require("./billing/billing.routes");
 const priceBandRoutes = require("./price-bands/price-bands.routes");
 const dashboardRoutes = require("./dashboard/dashboard.routes");
 const addOnRoutes = require("./add-on-services/add-on-services.routes");
+const chatRoutes = require("./chats/chats.routes");
+const accessKeyRoutes = require("./access-keys/access-keys.routes");
 
 function registerModules(app) {
   app.use("/api/v1/auth", authRoutes);
@@ -40,6 +42,8 @@ function registerModules(app) {
   app.use("/api/v1/price-bands", priceBandRoutes);
   app.use("/api/v1/dashboard", dashboardRoutes);
   app.use("/api/v1/add-on-services", addOnRoutes);
+  app.use("/api/v1/chats", chatRoutes);
+  app.use("/api/v1/access-keys", accessKeyRoutes);
 }
 
 module.exports = { registerModules };
