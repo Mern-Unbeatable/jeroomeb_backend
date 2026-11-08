@@ -223,7 +223,10 @@ async function requestAddOn(user, addOnServiceId) {
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
-      customer_email: user.email,
+      ...(organization.stripeCustomerId
+        ? { customer: organization.stripeCustomerId }
+        : { customer_email: user.email }),
+      invoice_creation: { enabled: true },
       client_reference_id: organization.id,
       metadata: {
         purpose: "ADD_ON",

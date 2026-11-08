@@ -29,4 +29,25 @@ const confirmSchema = z.object({
   sessionId: z.string().trim().min(1),
 });
 
-module.exports = { propertyTypes, propertyTypeByInput, checkoutSchema, confirmSchema };
+const paymentMethodSchema = z.object({
+  successUrl: z.string().trim().min(1).optional(),
+  cancelUrl: z.string().trim().min(1).optional(),
+});
+
+const changePlanSchema = z.object({
+  priceBandId: z.uuid(),
+  propertyType: z
+    .string()
+    .trim()
+    .refine((value) => propertyTypeByInput.has(value), { message: "Unknown property type" })
+    .optional(),
+});
+
+module.exports = {
+  propertyTypes,
+  propertyTypeByInput,
+  checkoutSchema,
+  confirmSchema,
+  paymentMethodSchema,
+  changePlanSchema,
+};
