@@ -64,15 +64,18 @@ const priceBandRenames = [
   ["FULL_SERVICE", "1-49 units", "Tier 1 (Baseline)"],
   ["FULL_SERVICE", "50-149 units", "Tier 2 (Premier)"],
   ["FULL_SERVICE", "150+ units", "Tier 3 (Sovereign)"],
+  ["SOFTWARE", "1-49 units", "Tier 1 (Baseline)"],
+  ["SOFTWARE", "50-149 units", "Tier 2 (Premier)"],
+  ["SOFTWARE", "150+ units", "Tier 3 (Sovereign)"],
 ];
 
 const priceBands = [
-  { kind: "FULL_SERVICE", name: "Tier 1 (Baseline)", minUnits: 1, maxUnits: 49, monthlyPrice: "115.00" },
-  { kind: "FULL_SERVICE", name: "Tier 2 (Premier)", minUnits: 50, maxUnits: 149, monthlyPrice: "170.00" },
-  { kind: "FULL_SERVICE", name: "Tier 3 (Sovereign)", minUnits: 150, maxUnits: null, monthlyPrice: "225.00" },
-  { kind: "SOFTWARE", name: "1-49 units", minUnits: 1, maxUnits: 49, monthlyPrice: "299.00" },
-  { kind: "SOFTWARE", name: "50-149 units", minUnits: 50, maxUnits: 149, monthlyPrice: "449.00" },
-  { kind: "SOFTWARE", name: "150+ units", minUnits: 150, maxUnits: null, monthlyPrice: "0.00" },
+  { kind: "FULL_SERVICE", name: "Tier 1 (Baseline)", minUnits: 1, maxUnits: 49, maxSquareFootage: null, monthlyPrice: "115.00" },
+  { kind: "FULL_SERVICE", name: "Tier 2 (Premier)", minUnits: 50, maxUnits: 149, maxSquareFootage: null, monthlyPrice: "170.00" },
+  { kind: "FULL_SERVICE", name: "Tier 3 (Sovereign)", minUnits: 150, maxUnits: null, maxSquareFootage: null, monthlyPrice: "225.00" },
+  { kind: "SOFTWARE", name: "Tier 1 (Baseline)", minUnits: 1, maxUnits: 200, maxSquareFootage: 250000, monthlyPrice: "299.00" },
+  { kind: "SOFTWARE", name: "Tier 2 (Premier)", minUnits: 201, maxUnits: 500, maxSquareFootage: 600000, monthlyPrice: "449.00" },
+  { kind: "SOFTWARE", name: "Tier 3 (Sovereign)", minUnits: 501, maxUnits: null, maxSquareFootage: null, monthlyPrice: "0.00" },
 ];
 
 const addOnServices = [
@@ -214,11 +217,30 @@ async function seedPriceBands() {
     if (existing) {
       await prisma.servicePriceBand.update({
         where: { id: existing.id },
-        data: { minUnits: band.minUnits, maxUnits: band.maxUnits, active: true },
+        data: {
+          minUnits: band.minUnits,
+          maxUnits: band.maxUnits,
+          maxSquareFootage: band.maxSquareFootage,
+          active: true,
+        },
       });
       continue;
     }
     await prisma.servicePriceBand.create({ data: band });
+  }
+
+  const softwareNames = ["Tier 1 (Baseline)", "Tier 2 (Premier)", "Tier 3 (Sovereign)"];
+  for (const name of softwareNames) {
+    const rows = await prisma.servicePriceBand.findMany({
+      where: { kind: "SOFTWARE", name, active: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const extra = rows.slice(1).map((row) => row.id);
+    if (!extra.length) continue;
+    await prisma.servicePriceBand.updateMany({
+      where: { id: { in: extra } },
+      data: { active: false },
+    });
   }
 }
 

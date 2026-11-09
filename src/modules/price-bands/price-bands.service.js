@@ -12,6 +12,7 @@ function toBand(band) {
     name: band.name,
     minUnits: band.minUnits,
     maxUnits: band.maxUnits,
+    maxSquareFootage: band.maxSquareFootage,
     monthlyPrice: money(band.monthlyPrice),
     active: band.active,
   };

@@ -2,13 +2,9 @@ const prisma = require("../../shared/prisma");
 const stripe = require("../../shared/stripe");
 const { HttpError } = require("../../shared/http");
 const { propertyTypes, propertyTypeByInput } = require("./billing.validation");
+const { SOFTWARE_PRODUCT, dollars, contactOnly, loadBands, presentPlans } = require("./plan-tiers");
 
 const propertyTypeLabels = new Map(propertyTypes);
-
-function dollars(value) {
-  if (value == null) return null;
-  return Number(value.toString()).toFixed(2);
-}
 
 function stripeTime(seconds) {
   if (!seconds) return null;
@@ -27,8 +23,8 @@ async function account(user) {
     where: { id: user.organizationId },
     include: { servicePriceBand: true },
   });
-  if (!organization || organization.planKind !== "FULL_SERVICE") {
-    throw new HttpError(403, "This page is available on a Service + Software plan");
+  if (!organization || (organization.planKind !== "FULL_SERVICE" && organization.planKind !== "SOFTWARE")) {
+    throw new HttpError(403, "This page is available on a Software Only or Service + Software plan");
   }
   return organization;
 }
@@ -63,17 +59,8 @@ async function syncEnded(organization, subscription) {
   });
 }
 
-async function availablePlans(currentBandId) {
-  const bands = await prisma.servicePriceBand.findMany({
-    where: { active: true, kind: "FULL_SERVICE" },
-    orderBy: { monthlyPrice: "asc" },
-  });
-  return bands.map((band) => ({
-    id: band.id,
-    name: band.name,
-    monthlyPrice: dollars(band.monthlyPrice),
-    current: band.id === currentBandId,
-  }));
+async function availablePlans(kind, currentBandId) {
+  return presentPlans(await loadBands(kind), currentBandId);
 }
 
 async function present(user) {
@@ -93,7 +80,12 @@ async function present(user) {
           propertyTypeLabel: property ? propertyTypeLabels.get(property.propertyType) : null,
           id: band.id,
           name: band.name,
+          kind: organization.planKind,
+          productName: organization.planKind === "SOFTWARE" ? SOFTWARE_PRODUCT : null,
           status: active ? "Active" : "Cancelled",
+          billingCycle: "Monthly Recurring",
+          paymentStatus: active ? "Paid" : "Unpaid",
+          autoRenew: active && !cancelAtPeriodEnd,
           nextBilling: active ? stripeTime(ends) : null,
           amount: dollars(band.monthlyPrice),
           cancelAtPeriodEnd: active && cancelAtPeriodEnd,
@@ -101,7 +93,7 @@ async function present(user) {
         }
       : null,
     propertyTypes: propertyTypes.map(([value, label]) => ({ value, label })),
-    availablePlans: await availablePlans(band ? band.id : null),
+    availablePlans: await availablePlans(organization.planKind, band ? band.id : null),
   };
 }
 
@@ -115,9 +107,9 @@ async function applyPropertyType(organizationId, propertyType) {
   });
 }
 
-async function fullServiceBand(priceBandId) {
+async function matchingBand(priceBandId, kind) {
   const band = await prisma.servicePriceBand.findFirst({
-    where: { id: priceBandId, active: true, kind: "FULL_SERVICE" },
+    where: { id: priceBandId, active: true, kind },
   });
   if (!band) throw new HttpError(400, "Plan not found");
   return band;
@@ -166,7 +158,10 @@ async function changePlan(user, input) {
   if (organization.subscriptionStatus !== "ACTIVE") {
     throw new HttpError(403, "Choose a plan and complete payment before changing it");
   }
-  const band = await fullServiceBand(input.priceBandId);
+  const band = await matchingBand(input.priceBandId, organization.planKind);
+  if (contactOnly(band) && organization.servicePriceBandId !== band.id) {
+    throw new HttpError(400, "Contact us for this plan");
+  }
   await applyPropertyType(organization.id, input.propertyType);
   if (organization.servicePriceBandId === band.id) {
     if (!input.propertyType) throw new HttpError(409, "This plan is already active");
@@ -175,7 +170,7 @@ async function changePlan(user, input) {
   if (organization.stripeSubscriptionId) await replaceStripePrice(organization, band);
   await prisma.organization.update({
     where: { id: organization.id },
-    data: { servicePriceBandId: band.id, planKind: "FULL_SERVICE" },
+    data: { servicePriceBandId: band.id, planKind: organization.planKind },
   });
   await prisma.activityEvent.create({
     data: {

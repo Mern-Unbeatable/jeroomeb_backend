@@ -296,8 +296,93 @@ async function changePassword(userId, input) {
   return { message: "Password updated" };
 }
 
-function currentUser(user) {
-  return toPublicUser(user);
+const accountRoles = {
+  CLIENT: "Authorized Client Admin",
+  TENANT_ADMIN: "Tenant Admin",
+};
+
+function propertyAddress(property) {
+  if (!property) return null;
+  const region = [property.state, property.zip].filter(Boolean).join(" ");
+  return [property.street, property.city, region].filter(Boolean).join(", ");
+}
+
+async function loadAccount(user) {
+  if (!user.organizationId) throw new HttpError(403, "This account has no company");
+  const record = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { organization: true },
+  });
+  if (!record || !record.organization) throw new HttpError(404, "Company not found");
+  const property = await prisma.property.findFirst({
+    where: { organizationId: record.organizationId },
+    orderBy: { createdAt: "desc" },
+  });
+  return { record, property };
+}
+
+function withAccount(record, property) {
+  return {
+    ...toPublicUser(record),
+    companyName: record.organization ? record.organization.name : null,
+    numberOfUnits: property ? property.unitCount : null,
+    squareFootage: property ? property.squareFootage : null,
+    propertyAddress: propertyAddress(property),
+    street: property ? property.street : null,
+    city: property ? property.city : null,
+    state: property ? property.state : null,
+    zip: property ? property.zip : null,
+    accountRole: accountRoles[record.role] || record.role,
+  };
+}
+
+async function currentUser(user) {
+  if (!user.organizationId) return toPublicUser(user);
+  const { record, property } = await loadAccount(user);
+  return withAccount(record, property);
+}
+
+async function updateMe(user, input) {
+  const { record, property } = await loadAccount(user);
+  const userData = {};
+  if (input.fullName !== undefined) userData.fullName = input.fullName;
+  if (input.phone !== undefined) userData.phone = input.phone;
+  if (input.email !== undefined) userData.email = input.email.trim().toLowerCase();
+
+  const propertyData = {};
+  if (input.numberOfUnits !== undefined) propertyData.unitCount = input.numberOfUnits;
+  if (input.squareFootage !== undefined) propertyData.squareFootage = input.squareFootage;
+  if (input.propertyAddress !== undefined) propertyData.street = input.propertyAddress;
+  for (const field of ["city", "state", "zip"]) {
+    if (input[field] !== undefined) propertyData[field] = input[field] === "" ? null : input[field];
+  }
+  if (Object.keys(propertyData).length && !property) {
+    throw new HttpError(404, "Property not found");
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (Object.keys(userData).length) {
+        await tx.user.update({ where: { id: record.id }, data: userData });
+      }
+      if (input.companyName !== undefined) {
+        await tx.organization.update({
+          where: { id: record.organizationId },
+          data: { name: input.companyName },
+        });
+      }
+      if (Object.keys(propertyData).length) {
+        await tx.property.update({ where: { id: property.id }, data: propertyData });
+      }
+    });
+  } catch (error) {
+    if (isUniqueConflict(error, "email")) {
+      throw new HttpError(409, "An account with this email already exists");
+    }
+    throw error;
+  }
+
+  return currentUser(record);
 }
 
 module.exports = {
@@ -308,4 +393,5 @@ module.exports = {
   resetPassword,
   changePassword,
   currentUser,
+  updateMe,
 };

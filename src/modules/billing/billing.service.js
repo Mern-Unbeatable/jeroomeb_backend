@@ -3,6 +3,7 @@ const prisma = require("../../shared/prisma");
 const stripe = require("../../shared/stripe");
 const { HttpError } = require("../../shared/http");
 const { propertyTypes, propertyTypeByInput } = require("./billing.validation");
+const { sortBands, limitLabel } = require("./plan-tiers");
 
 const kindLabels = {
   SOFTWARE: "Software Only",
@@ -53,7 +54,7 @@ function returnUrl(value, field) {
   return value;
 }
 
-function toPlan(band) {
+function toPlan(band, previous) {
   return {
     id: band.id,
     kind: band.kind,
@@ -62,6 +63,9 @@ function toPlan(band) {
     monthlyPrice: money(band.monthlyPrice),
     minUnits: band.minUnits,
     maxUnits: band.maxUnits,
+    maxSquareFootage: band.maxSquareFootage,
+    limitLabel: limitLabel(band, previous),
+    contactOnly: Number(band.monthlyPrice.toString()) === 0,
   };
 }
 
@@ -73,6 +77,18 @@ async function plans(kind) {
     where: { active: true, ...(kind ? { kind } : {}) },
     orderBy: [{ kind: "asc" }, { monthlyPrice: "asc" }],
   });
+  const ordered = [];
+  let group = [];
+  let groupKind = null;
+  for (const band of bands) {
+    if (band.kind !== groupKind) {
+      if (group.length) ordered.push(...sortBands(group));
+      group = [];
+      groupKind = band.kind;
+    }
+    group.push(band);
+  }
+  if (group.length) ordered.push(...sortBands(group));
   return {
     publishableKey: env.STRIPE_PUBLISHABLE_KEY,
     options: [
@@ -88,7 +104,7 @@ async function plans(kind) {
       },
     ],
     propertyTypes: propertyTypes.map(([value, label]) => ({ value, label })),
-    plans: bands.map(toPlan),
+    plans: ordered.map((band, index) => toPlan(band, ordered[index - 1] && ordered[index - 1].kind === band.kind ? ordered[index - 1] : null)),
   };
 }
 
@@ -111,6 +127,9 @@ async function checkout(user, input) {
     where: { id: input.priceBandId, active: true },
   });
   if (!band) throw new HttpError(400, "Plan not found");
+  if (Number(band.monthlyPrice.toString()) === 0) {
+    throw new HttpError(400, "Contact us for this plan");
+  }
 
   if (input.propertyType) {
     const property = await prisma.property.findFirst({

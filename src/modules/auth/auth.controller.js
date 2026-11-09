@@ -7,6 +7,7 @@ const {
   verifyOtpSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  profileSchema,
   parseBody,
 } = require("./auth.validation");
 const authService = require("./auth.service");
@@ -58,7 +59,12 @@ async function me(req, res) {
   if (!req.user) {
     throw new HttpError(401, "Authentication required");
   }
-  res.json({ user: authService.currentUser(req.user) });
+  res.json({ user: await authService.currentUser(req.user) });
+}
+
+async function updateMe(req, res) {
+  const input = parseBody(profileSchema, req.body);
+  res.json({ user: await authService.updateMe(req.user, input) });
 }
 
 module.exports = {
@@ -70,4 +76,5 @@ module.exports = {
   resetPassword,
   changePassword,
   me,
+  updateMe,
 };

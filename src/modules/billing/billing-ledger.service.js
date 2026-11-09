@@ -42,7 +42,7 @@ function checkoutSuccessUrl(value) {
   return `${target}${target.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`;
 }
 
-async function fullServiceAccount(user) {
+async function billingAccount(user) {
   if (!user.organizationId) throw new HttpError(403, "This account has no company");
   const organization = await prisma.organization.findUnique({
     where: { id: user.organizationId },
@@ -50,9 +50,9 @@ async function fullServiceAccount(user) {
   if (
     !organization ||
     organization.subscriptionStatus !== "ACTIVE" ||
-    organization.planKind !== "FULL_SERVICE"
+    (organization.planKind !== "FULL_SERVICE" && organization.planKind !== "SOFTWARE")
   ) {
-    throw new HttpError(403, "The billing ledger is available on an active Service + Software plan");
+    throw new HttpError(403, "The billing ledger is available on an active Software Only or Service + Software plan");
   }
   return organization;
 }
@@ -197,7 +197,7 @@ async function serviceLedger(user, organization) {
 }
 
 async function ledger(user) {
-  const organization = await fullServiceAccount(user);
+  const organization = await billingAccount(user);
   const paymentMethod = await currentPaymentMethod(organization);
   const invoices = await listInvoices(organization, paymentMethod);
   const totalSettled = invoices
@@ -208,7 +208,7 @@ async function ledger(user) {
     paymentMethod,
     invoices,
     totalSettled: totalSettled.toFixed(2),
-    serviceLedger: await serviceLedger(user, organization),
+    serviceLedger: organization.planKind === "FULL_SERVICE" ? await serviceLedger(user, organization) : [],
   };
 }
 
@@ -225,7 +225,7 @@ async function loadInvoice(id) {
 }
 
 async function invoiceDetail(user, invoiceId) {
-  const organization = await fullServiceAccount(user);
+  const organization = await billingAccount(user);
   const invoice = await loadInvoice(invoiceId);
   const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer && invoice.customer.id;
   if (!organization.stripeCustomerId || customerId !== organization.stripeCustomerId) {
@@ -254,7 +254,7 @@ async function invoiceDetail(user, invoiceId) {
 }
 
 async function startPaymentMethod(user, input) {
-  const organization = await fullServiceAccount(user);
+  const organization = await billingAccount(user);
   if (!organization.stripeCustomerId) {
     throw new HttpError(403, "Complete payment before updating a payment method");
   }
@@ -281,7 +281,7 @@ async function startPaymentMethod(user, input) {
 }
 
 async function confirmPaymentMethod(user, sessionId) {
-  const organization = await fullServiceAccount(user);
+  const organization = await billingAccount(user);
   if (!organization.stripeCustomerId) {
     throw new HttpError(403, "Complete payment before updating a payment method");
   }

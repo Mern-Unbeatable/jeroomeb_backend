@@ -3,6 +3,7 @@ const { parseBody, HttpError } = require("../../shared/http");
 const {
   createPropertySchema,
   updatePropertySchema,
+  clientPropertySchema,
   rosterSchema,
 } = require("./properties.validation");
 const propertyService = require("./properties.service");
@@ -25,6 +26,11 @@ async function create(req, res) {
   const input = parseBody(createPropertySchema, req.body);
   const result = await propertyService.create(input, req.user);
   res.status(201).json(result);
+}
+
+async function updateMine(req, res) {
+  const input = parseBody(clientPropertySchema, req.body);
+  res.json(await propertyService.updateMine(req.user, input));
 }
 
 async function update(req, res) {
@@ -51,4 +57,4 @@ async function removeRoster(req, res) {
   );
 }
 
-module.exports = { list, show, create, update, remove, assignRoster, removeRoster };
+module.exports = { list, show, create, update, updateMine, remove, assignRoster, removeRoster };

@@ -5,7 +5,9 @@ const propertyController = require("./properties.controller");
 
 const router = express.Router();
 const adminOnly = [requireAuth, requireRole("SUPER_ADMIN", "TEAM_MEMBER")];
+const client = [requireAuth, requireRole("CLIENT", "TENANT_ADMIN")];
 
+router.patch("/me", ...client, asyncHandler(propertyController.updateMine));
 router.get("/", ...adminOnly, asyncHandler(propertyController.list));
 router.post("/", ...adminOnly, asyncHandler(propertyController.create));
 router.get("/:id", ...adminOnly, asyncHandler(propertyController.show));

@@ -325,4 +325,44 @@ async function removeRoster(propertyId, rosterId, actor) {
   return { message: "Roster assignment removed" };
 }
 
-module.exports = { list, getById, create, update, remove, assignRoster, removeRoster };
+function clientProperty(property) {
+  return {
+    id: property.id,
+    code: property.code,
+    name: property.name,
+    propertyType: property.propertyType,
+    status: property.status,
+    street: property.street,
+    city: property.city,
+    state: property.state,
+    zip: property.zip,
+    address: [property.street, property.city, [property.state, property.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+    unitCount: property.unitCount,
+    squareFootage: property.squareFootage,
+  };
+}
+
+async function updateMine(user, input) {
+  if (!user.organizationId) throw new HttpError(403, "This account has no company");
+  const existing = await prisma.property.findFirst({
+    where: { organizationId: user.organizationId },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!existing) throw new HttpError(404, "Property not found");
+
+  const data = {};
+  for (const field of ["name", "street", "unitCount", "squareFootage"]) {
+    if (input[field] !== undefined) data[field] = input[field];
+  }
+  for (const field of ["city", "state", "zip"]) {
+    if (input[field] !== undefined) data[field] = input[field] === "" ? null : input[field];
+  }
+
+  const saved = await prisma.property.update({
+    where: { id: existing.id },
+    data,
+  });
+  return { property: clientProperty(saved) };
+}
+
+module.exports = { list, getById, create, update, remove, assignRoster, removeRoster, updateMine };

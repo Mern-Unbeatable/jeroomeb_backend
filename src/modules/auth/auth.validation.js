@@ -32,6 +32,23 @@ const resetPasswordSchema = z.object({
   confirmPassword: z.string().min(1).max(72),
 });
 
+const profileSchema = z
+  .object({
+    fullName: z.string().trim().min(1).max(120).optional(),
+    email: z.email().optional(),
+    phone: z.string().trim().min(7).max(30).optional(),
+    companyName: z.string().trim().min(1).max(160).optional(),
+    numberOfUnits: z.coerce.number().int().positive().optional(),
+    squareFootage: z.coerce.number().int().positive().optional(),
+    propertyAddress: z.string().trim().min(1).max(300).optional(),
+    city: z.string().trim().max(80).optional(),
+    state: z.string().trim().max(80).optional(),
+    zip: z.string().trim().max(20).optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "Nothing to update",
+  });
+
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(72),
   newPassword: z.string().min(8).max(72),
@@ -53,5 +70,6 @@ module.exports = {
   verifyOtpSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  profileSchema,
   parseBody,
 };

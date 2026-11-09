@@ -17,7 +17,7 @@
 }
 ```
 
-`token` কপি করে Bearer Token-এ বসান। অ্যাকাউন্ট Service + Software কিনে `ACTIVE` হতে হবে। না হলে লেজার `403` এবং `{ "message": "The billing ledger is available on an active Service + Software plan" }`।
+`token` কপি করে Bearer Token-এ বসান। অ্যাকাউন্ট Service + Software কিনে `ACTIVE` হতে হবে। না হলে লেজার `403` এবং `{ "message": "The billing ledger is available on an active Software Only or Service + Software plan" }`।
 
 ## 2. লেজার
 

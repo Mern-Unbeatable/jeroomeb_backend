@@ -1,13 +1,15 @@
 const prisma = require("../../shared/prisma");
 const stripe = require("../../shared/stripe");
 const { HttpError } = require("../../shared/http");
+const { SOFTWARE_PRODUCT, loadBands, presentPlans, tierProgress } = require("../billing/plan-tiers");
 
 const openRequestStatuses = ["PENDING_REVIEW", "IN_PROGRESS", "ONGOING"];
 const activeRequestStatuses = ["APPROVED", "ONGOING", "IN_PROGRESS"];
 const paidSubscriptionStatuses = new Set(["active", "trialing"]);
 
 function address(property) {
-  return [property.street, property.city, property.state, property.zip].filter(Boolean).join(", ");
+  const region = [property.state, property.zip].filter(Boolean).join(" ");
+  return [property.street, property.city, region].filter(Boolean).join(", ");
 }
 
 async function refreshSubscription(organization) {
@@ -139,6 +141,8 @@ async function overview(user) {
       : [];
 
   const plan = organization.servicePriceBand;
+  const software = organization.planKind === "SOFTWARE";
+  const softwareBands = software ? await loadBands("SOFTWARE") : [];
   return {
     user: { fullName: user.fullName, email: user.email },
     company: { id: organization.id, name: organization.name },
@@ -149,6 +153,12 @@ async function overview(user) {
           name: property.name,
           propertyType: property.propertyType,
           address: address(property),
+          street: property.street,
+          city: property.city,
+          state: property.state,
+          zip: property.zip,
+          unitCount: property.unitCount,
+          squareFootage: property.squareFootage,
           status: property.status,
         }
       : null,
@@ -161,10 +171,17 @@ async function overview(user) {
           id: plan.id,
           name: plan.name,
           kind: plan.kind,
-          monthlyPrice: plan.monthlyPrice.toString(),
+          productName: software ? SOFTWARE_PRODUCT : null,
+          monthlyPrice: software
+            ? Number(plan.monthlyPrice.toString()).toFixed(2)
+            : plan.monthlyPrice.toString(),
+          billingCycle: "Monthly Recurring",
+          status: "Active",
           paidAt: organization.paidAt,
         }
       : null,
+    tierStatus: software ? tierProgress(plan, softwareBands, property) : null,
+    softwareTiers: software ? presentPlans(softwareBands, plan ? plan.id : null) : null,
     services,
     pendingAddOns,
     availableAddOns,

@@ -57,9 +57,23 @@ const createPropertySchema = z.object({
 
 const updatePropertySchema = z.object(propertyFields).partial();
 
+const clientPropertySchema = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    street: z.string().trim().min(1).max(300).optional(),
+    city: z.string().trim().max(80).optional(),
+    state: z.string().trim().max(80).optional(),
+    zip: z.string().trim().max(20).optional(),
+    unitCount: z.coerce.number().int().positive().optional(),
+    squareFootage: z.coerce.number().int().positive().optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "Nothing to update",
+  });
+
 const rosterSchema = z.object({
   specialistId: z.uuid(),
   assignment: z.enum(assignments),
 });
 
-module.exports = { createPropertySchema, updatePropertySchema, rosterSchema };
+module.exports = { createPropertySchema, updatePropertySchema, clientPropertySchema, rosterSchema };
