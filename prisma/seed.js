@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const prisma = require("../src/shared/prisma");
+const { fullServicePrices, softwarePlans } = require("../src/modules/settings/pricing-defaults");
 
 const licensePlans = [
   { name: "Essential", kind: "SOFTWARE", monthlyPrice: "299.00", propertyLimit: 5 },
@@ -311,6 +312,21 @@ async function seedChecklistTemplates() {
   }
 }
 
+async function seedPlatformPricing() {
+  for (const [propertyType, , tier, amount] of fullServicePrices) {
+    const existing = await prisma.fullServiceMatrixPrice.findUnique({
+      where: { propertyType_tier: { propertyType, tier } },
+    });
+    if (existing) continue;
+    await prisma.fullServiceMatrixPrice.create({ data: { propertyType, tier, amount } });
+  }
+  for (const plan of softwarePlans) {
+    const existing = await prisma.softwarePlatformPlan.findUnique({ where: { tier: plan.tier } });
+    if (existing) continue;
+    await prisma.softwarePlatformPlan.create({ data: plan });
+  }
+}
+
 async function main() {
   await seedLicensePlans();
   console.log("Seeded license plans: Essential, Growth, Enterprise");
@@ -319,6 +335,7 @@ async function main() {
   await seedAddOnServices();
   await seedCompensationTiers();
   await seedChecklistTemplates();
+  await seedPlatformPricing();
 
   const [bands, addOns, tiers, templates, items] = await Promise.all([
     prisma.servicePriceBand.count(),
