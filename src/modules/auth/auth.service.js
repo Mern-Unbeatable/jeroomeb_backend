@@ -22,6 +22,8 @@ function toPublicUser(user) {
           id: user.organization.id,
           name: user.organization.name,
           subscriptionStatus: user.organization.subscriptionStatus,
+          planKind: user.organization.planKind,
+          
         }
       : null,
   };
@@ -96,7 +98,7 @@ async function createAccount(input) {
           where: { id: user.id },
           include: {
             organization: {
-              select: { id: true, name: true, subscriptionStatus: true },
+              select: { id: true, name: true, subscriptionStatus: true, planKind: true },
             },
           },
         });
@@ -127,7 +129,7 @@ async function login(input) {
     where: { email },
     include: {
       organization: {
-        select: { id: true, name: true, subscriptionStatus: true },
+        select: { id: true, name: true, subscriptionStatus: true, planKind: true },
       },
     },
   });

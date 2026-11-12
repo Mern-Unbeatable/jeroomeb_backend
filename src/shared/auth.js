@@ -66,7 +66,7 @@ async function authenticate(req) {
     where: { id: payload.sub },
     include: {
       organization: {
-        select: { id: true, name: true, subscriptionStatus: true },
+        select: { id: true, name: true, subscriptionStatus: true, planKind: true  },
       },
     },
   });
