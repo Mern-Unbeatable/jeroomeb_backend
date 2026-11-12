@@ -199,18 +199,24 @@ These need the super admin token.
 
 `POST http://localhost:3000/api/v1/organizations/provision`
 
+`priceBandId` comes from `GET /api/v1/billing/plans?kind=SOFTWARE`. That is Tier 1 `$299`, Tier 2 `$449`, or Tier 3 Contact Us. The password is the one the super admin types. The server emails that email and password to the tenant. `subscriptionStatus` is `ACTIVE` or `INACTIVE`.
+
 ```json
 {
   "name": "Northstar Communities",
+  "priceBandId": "paste-software-tier-id",
+  "propertyLimit": 5,
+  "subscriptionStatus": "ACTIVE",
   "admin": {
     "fullName": "Jordan Hale",
     "email": "jordan@northstar.example",
-    "phone": "555-0100"
+    "phone": "555-0100",
+    "password": "TenantPass#2026"
   }
 }
 ```
 
-Expect `201` with the tenant, a `TENANT_ADMIN` user, and a `temporaryPassword`. Optional `licensePlanId` and `checklistTemplateIds` attach a plan and checklist access.
+Expect `201` with the tenant and a `TENANT_ADMIN` user. The password is not in the response. Optional `checklistTemplateIds` attaches checklist access. A Full-Service tier id returns `400` and `{ "message": "Software plan not found" }`.
 
 `GET /api/v1/organizations` lists tenants. `GET /api/v1/organizations/<id>` is the tenant detail.
 

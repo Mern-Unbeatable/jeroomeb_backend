@@ -1,8 +1,8 @@
-const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const prisma = require("../../shared/prisma");
 const { HttpError } = require("../../shared/http");
 const { isUniqueConflict } = require("../../shared/codes");
+const { sendTenantWelcomeEmail } = require("../../shared/mailer");
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
@@ -99,12 +99,10 @@ async function getById(id) {
 
 async function provision(input, actor) {
   const email = normalizeEmail(input.admin.email);
-  const plan = input.licensePlanId
-    ? await prisma.licensePlan.findUnique({ where: { id: input.licensePlanId } })
-    : null;
-  if (input.licensePlanId && !plan) {
-    throw new HttpError(400, "License plan not found");
-  }
+  const band = await prisma.servicePriceBand.findFirst({
+    where: { id: input.priceBandId, active: true, kind: "SOFTWARE" },
+  });
+  if (!band) throw new HttpError(400, "Software plan not found");
 
   const templateIds = [...new Set(input.checklistTemplateIds)];
   if (templateIds.length) {
@@ -116,17 +114,17 @@ async function provision(input, actor) {
     }
   }
 
-  const temporaryPassword = crypto.randomBytes(9).toString("base64url");
-  const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+  const passwordHash = await bcrypt.hash(input.admin.password, 12);
 
   try {
     const result = await prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {
           name: input.name,
-          licensePlanId: plan ? plan.id : null,
-          propertyLimit: input.propertyLimit ?? (plan ? plan.propertyLimit : null),
-          subscriptionStatus: "ACTIVE",
+          planKind: "SOFTWARE",
+          servicePriceBandId: band.id,
+          propertyLimit: input.propertyLimit ?? null,
+          subscriptionStatus: input.subscriptionStatus,
           checklistAccess: {
             create: templateIds.map((templateId) => ({ templateId })),
           },
@@ -160,6 +158,18 @@ async function provision(input, actor) {
       return { organization, user };
     });
 
+    try {
+      await sendTenantWelcomeEmail({
+        to: email,
+        fullName: input.admin.fullName,
+        organizationName: result.organization.name,
+        password: input.admin.password,
+      });
+    } catch (error) {
+      console.error("Tenant welcome email failed:", error.message);
+      throw new HttpError(502, "The tenant was created, but the welcome email could not be sent");
+    }
+
     return {
       tenant: toTenant(result.organization),
       user: {
@@ -170,7 +180,6 @@ async function provision(input, actor) {
         status: result.user.status,
         mustChangePassword: result.user.mustChangePassword,
       },
-      temporaryPassword,
     };
   } catch (error) {
     if (isUniqueConflict(error, "email")) {

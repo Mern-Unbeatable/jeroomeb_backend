@@ -30,6 +30,7 @@ enum PlanKind {
 enum SubscriptionStatus {
   UNPAID
   ACTIVE
+  INACTIVE
   SUSPENDED
   CANCELLED
 }

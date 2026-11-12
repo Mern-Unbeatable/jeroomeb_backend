@@ -33,4 +33,22 @@ async function sendPasswordResetEmail({ to, otp, expiresAt }) {
   });
 }
 
-module.exports = { sendPasswordResetEmail };
+async function sendTenantWelcomeEmail({ to, fullName, organizationName, password }) {
+  await transporter.sendMail({
+    from: fromAddress(),
+    to,
+    subject: "Your AmenityOps tenant account",
+    text: [
+      `Hello ${fullName},`,
+      "",
+      `A tenant account is ready for ${organizationName}.`,
+      "",
+      `Email: ${to}`,
+      `Password: ${password}`,
+      "",
+      "Sign in with this email and password.",
+    ].join("\n"),
+  });
+}
+
+module.exports = { sendPasswordResetEmail, sendTenantWelcomeEmail };
