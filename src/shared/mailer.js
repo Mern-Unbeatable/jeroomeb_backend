@@ -51,4 +51,22 @@ async function sendTenantWelcomeEmail({ to, fullName, organizationName, password
   });
 }
 
-module.exports = { sendPasswordResetEmail, sendTenantWelcomeEmail };
+async function sendTeamWelcomeEmail({ to, fullName, organizationName, roleLabel, password }) {
+  await transporter.sendMail({
+    from: fromAddress(),
+    to,
+    subject: "Your AmenityOps team account",
+    text: [
+      `Hello ${fullName},`,
+      "",
+      `You have been added to ${organizationName} as ${roleLabel}.`,
+      "",
+      `Email: ${to}`,
+      `Password: ${password}`,
+      "",
+      "Sign in with this email and password, then choose your own password.",
+    ].join("\n"),
+  });
+}
+
+module.exports = { sendPasswordResetEmail, sendTenantWelcomeEmail, sendTeamWelcomeEmail };
