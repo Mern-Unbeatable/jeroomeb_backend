@@ -83,3 +83,31 @@ Bearer সরিয়ে আবার `GET /api/v1/analytics`। আশা ক�
 ## 5. ক্লায়েন্ট টোকেন
 
 ক্লায়েন্ট বা টেন্যান্ট অ্যাডমিনের `token` দিয়ে একই GET। আশা করুন `403` এবং `{ "message": "You do not have access to this" }`।
+
+## 6. সুপার অ্যাডমিন Overview
+
+সেকশন ১-এর সুপার অ্যাডমিন `token` ব্যবহার করুন। ক্লায়েন্টের ড্যাশবোর্ড আলাদা: `GET /api/v1/dashboard`। এই পেজের রাউট নিচেরটা।
+
+`GET http://localhost:3000/api/v1/dashboard/overview`
+
+Postman ভেরিয়েবল থাকলে `GET {{baseUrl}}/dashboard/overview`, যেখানে `baseUrl` হল `http://localhost:3000/api/v1`।
+
+বডি none। Params খালি। আশা করুন `200`।
+
+| স্ক্রিন | কী | কী দেখবেন |
+| --- | --- | --- |
+| আটটা কার্ড | `cards` | Analytics-এর আটটা কার্ডের মতো। `totalProperties.value`, `pendingProperties.value`, `inspectionsInProgress.value` আর `activeRightNow`, `totalRevenue.amount`, `revenueThisMonth`, `fullServiceRevenue`, `softwareRevenue`, `addOnRevenue`। |
+| Revenue analytics | `revenue.months` | ঠিক ১২টা সারি। `month`, `label`, `fullService`, `software`। |
+| Recent activity | `recentActivity` | সর্বশেষ ৮টা। প্রতিটিতে `title`, `summary`, `actorName`, `createdAt`। সময় ফ্রন্টএন্ড `createdAt` থেকে বানাবে। |
+| Upcoming inspections | `upcomingInspections` | এখন থেকে পরের ৭ দিন, শুধু `PENDING` আর `IN_PROGRESS`। `propertyName`, `propertyCode`, `inspectorName`, `scheduledAt`, `workflow`, `statusLabel`। কেউ অ্যাসাইন না থাকলে `inspectorName` হয় `null`। এই উইন্ডোতে কিছু না থাকলে `[]`। |
+| Service requests | `serviceRequests` | সাম্প্রতিক ৫টা। `name`, `companyName`, `requestedAt`, `status`, `statusLabel` (`Pending Review`, `Approved`)। |
+
+টোকেন না দিলে `401`। ক্লায়েন্ট বা টেন্যান্ট অ্যাডমিনের টোকেনে `403` এবং `{ "message": "You do not have access to this" }`।
+
+## 7. Recent activity — View all
+
+`GET http://localhost:3000/api/v1/activity`
+
+একই সুপার অ্যাডমিন Bearer। বডি none। আশা করুন `200` এবং `activity` অ্যারে, সর্বশেষ ৫০টা। প্রতিটি সারির আকার Overview-এর `recentActivity`-এর মতো।
+
+ইনস্পেকশনের See all হল `GET http://localhost:3000/api/v1/inspections`। সার্ভিস রিকোয়েস্টের See all হল `GET http://localhost:3000/api/v1/service-requests`।

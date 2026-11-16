@@ -41,7 +41,7 @@ async function startPaymentMethod(req, res) {
   const result = await ledgerService.startPaymentMethod(req.user, input);
   res.status(201).json(result);
 }
-
+// confirm payment method
 async function confirmPaymentMethod(req, res) {
   const input = parseBody(confirmSchema, req.body);
   res.json(await ledgerService.confirmPaymentMethod(req.user, input.sessionId));
