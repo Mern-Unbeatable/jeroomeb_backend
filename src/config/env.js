@@ -7,7 +7,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
   JWT_EXPIRES_IN: z.string().min(1).default("30d"),
-  SMTP_HOST: z.string().min(1).default("smtp.gmail.com"),
+  SMTP_HOST: z.string().min(1).default("smtp.resend.com"),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_USER: z.string().min(1, "SMTP_USER is required"),
   SMTP_PASS: z

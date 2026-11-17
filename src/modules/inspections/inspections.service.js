@@ -435,14 +435,6 @@ async function resolve(id, input, actor) {
         summary: input.summary || null,
       },
     });
-    await tx.payout.create({
-      data: {
-        specialistId: existing.specialistId,
-        inspectionId: id,
-        amount: existing.property.compensationTier.payoutAmount,
-        status: "PENDING",
-      },
-    });
     let next = null;
     if (existing.property.checklistsAvailable247) {
       next = await tx.inspection.create({

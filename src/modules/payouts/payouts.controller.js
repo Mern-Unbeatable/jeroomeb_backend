@@ -1,5 +1,6 @@
 const { z } = require("zod");
-const { HttpError } = require("../../shared/http");
+const { HttpError, parseBody } = require("../../shared/http");
+const { requestPayoutSchema } = require("./payouts.validation");
 const payoutService = require("./payouts.service");
 
 function payoutId(value) {
@@ -16,4 +17,17 @@ async function show(req, res) {
   res.json(await payoutService.getById(payoutId(req.params.id), req.user));
 }
 
-module.exports = { list, show };
+async function requestPayout(req, res) {
+  const input = parseBody(requestPayoutSchema, req.body);
+  res.status(201).json(await payoutService.requestPayout(req.user, input));
+}
+
+async function approve(req, res) {
+  res.json(await payoutService.approve(payoutId(req.params.id), req.user));
+}
+
+async function markPaid(req, res) {
+  res.json(await payoutService.markPaid(payoutId(req.params.id), req.user));
+}
+
+module.exports = { list, show, requestPayout, approve, markPaid };

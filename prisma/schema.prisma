@@ -193,6 +193,7 @@ model Organization {
   serviceRequests    ServiceRequest[]
   checklistAccess    OrganizationChecklist[]
   chat               Chat?
+  specialistFeedback SpecialistFeedback[]
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 }
@@ -214,6 +215,7 @@ model User {
   submittedRequests   ServiceRequest[]     @relation("RequestSubmitter")
   activityEvents      ActivityEvent[]
   chatMessages        ChatMessage[]
+  specialistFeedback  SpecialistFeedback[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -418,6 +420,7 @@ model SpecialistProfile {
   roster                    PropertyRoster[]
   inspections               Inspection[]
   payouts                   Payout[]
+  feedback                  SpecialistFeedback[]
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
 }
@@ -532,6 +535,21 @@ model ChatMessage {
   createdAt DateTime @default(now())
 
   @@index([chatId, createdAt])
+}
+
+model SpecialistFeedback {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  specialistId   String
+  specialist     SpecialistProfile @relation(fields: [specialistId], references: [id], onDelete: Cascade)
+  rating         Int
+  comment        String
+  createdAt      DateTime          @default(now())
+
+  @@index([organizationId, createdAt])
 }
 
 model ActivityEvent {

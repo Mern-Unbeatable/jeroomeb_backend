@@ -324,3 +324,115 @@ Expect `200` and one `application` with the partner profile, market reach, strat
 `DELETE http://localhost:3000/api/v1/affiliates/applications/<profile-id>`
 
 Expect `200` and `{ "message": "Affiliate application deleted" }`. This removes the application and that affiliate user. Deleting the same id again returns `404`.
+
+## 13. Checklists
+
+Super admin only. Log in as `admin@amenityops.com` and set **Authorization → Bearer Token**. A team member or client gets `403` and `{ "message": "You do not have access to this" }`. No token returns `401`.
+
+### List
+
+`GET http://localhost:3000/api/v1/checklists`
+
+Body none. Expect `200` and `templates`. Each card has `id`, `name`, `propertyType`, and `itemCount`. The seeded cards are the 55+ Active Adult, Commercial Multi-Tenant, and Luxury Condominium audits. `itemCount` is the number under the name, such as `45` or `42`.
+
+### Save a new checklist type
+
+`POST http://localhost:3000/api/v1/checklists`
+
+**Body → raw → JSON**
+
+```json
+{
+  "name": "Waterfront Villas Checklist Master",
+  "items": [
+    {
+      "category": "Common Area Fire & Life Safety",
+      "name": "Path Obstructions",
+      "description": "Keep the exit path clear"
+    },
+    {
+      "category": "Common Area Fire & Life Safety",
+      "name": "Extinguishers"
+    }
+  ]
+}
+```
+
+Expect `201` and `checklist`:
+
+- `name` is the checklist name
+- `itemCount` is `2`
+- `items` follows the form order. `category` is Service Category, `name` is Item Name, `description` is the hover note
+- A missing `description` is `null`
+- `sortOrder` starts at `0`
+
+`name`, every `category`, and every item `name` are required. `items` must contain at least one row. An empty `items` array returns `400` and `{ "message": "Invalid request" }`.
+
+The same name again, ignoring letter case, returns `409` and `{ "message": "A checklist with this name already exists" }`.
+
+Call the list again. The new card is in `templates` with `itemCount` `2`. The list does not include the item rows.
+
+## 14. Specialist payouts
+
+Resolving an inspection does not create a payout. The assigned specialist requests payment. The super admin approves it, then marks it paid.
+
+### Specialist requests payment
+
+Log in as the specialist and set that `token` as **Authorization → Bearer Token**.
+
+`POST http://localhost:3000/api/v1/payouts/request`
+
+**Body → raw → JSON**
+
+```json
+{
+  "inspectionId": "the resolved inspection id"
+}
+```
+
+The inspection must be `RESOLVED_CLOSED` and assigned to this specialist. Expect `201`. `payout.status` is `PENDING`. `payout.amount` comes from the property compensation tier, such as `"75.00"`. `specialistCode` is the `OCS-` or `SPC-` code. `propertyName` and `completedAt` fill the table.
+
+The same inspection again returns `409` and `{ "message": "Payment was already requested" }`. An inspection that is not resolved returns `400` and `{ "message": "Resolve the inspection before requesting payment" }`. A super admin token returns `403`.
+
+### Super admin page
+
+Log in as `admin@amenityops.com` and replace the Bearer token.
+
+`GET http://localhost:3000/api/v1/payouts`
+
+Body none. Expect `200`.
+
+`cards`:
+
+| Key | Screen |
+| --- | --- |
+| `pendingApproval` | Pending Approval. `amount` and `count` are the `PENDING` rows. |
+| `readyToPay` | Approved / Ready to Pay. `APPROVED` rows. |
+| `totalPaidOut` | Total Paid Out. `PAID` rows. |
+
+`payouts` is the table. Each row has `specialistName`, `specialistCode`, `propertyName`, `completedAt`, `amount`, `status`, and `paymentAt`. `paymentAt` is empty while `PENDING`, the approval time while `APPROVED`, and `paidAt` when `PAID`.
+
+Tabs are the same list with a query:
+
+- All: `GET /api/v1/payouts`
+- Pending: `GET /api/v1/payouts?status=PENDING`
+- Approved: `GET /api/v1/payouts?status=APPROVED`
+- Paid: `GET /api/v1/payouts?status=PAID`
+
+The three cards stay the full totals. Only `payouts` is filtered. An unknown status returns `400`.
+
+`GET http://localhost:3000/api/v1/payouts/<payout-id>` is one row. An unknown id returns `404`.
+
+### Approve
+
+`POST http://localhost:3000/api/v1/payouts/<payout-id>/approve`
+
+Body none. Super admin only. Expect `200` and `payout.status` `APPROVED`. That row moves from Pending Approval to Approved / Ready to Pay. Approving it again returns `409` and `{ "message": "This payout is not awaiting approval" }`.
+
+### Mark Paid
+
+`POST http://localhost:3000/api/v1/payouts/<payout-id>/pay`
+
+Body none. Super admin only. The row must already be `APPROVED`. Expect `200`, `status` `PAID`, and `paidAt`. A `PENDING` row returns `400` and `{ "message": "Approve this payout before paying" }`. Paying it again returns `409` and `{ "message": "This payout is already paid" }`.
+
+A specialist token on approve or pay returns `403`. No token returns `401`. A specialist `GET /api/v1/payouts` returns only that specialist's rows and cards.
